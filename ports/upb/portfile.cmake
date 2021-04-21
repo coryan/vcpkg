@@ -10,6 +10,7 @@ vcpkg_from_github(
         add-cmake-install.patch
         fix-uwp.patch
         no-wyhash.patch
+        00001-fix-cmake-install.patch
 )
 
 vcpkg_configure_cmake(

@@ -1,0 +1,13 @@
+diff --git a/cmake/upb.cmake b/cmake/upb.cmake
+index 01c18f7..9ac1850 100644
+--- a/cmake/upb.cmake
++++ b/cmake/upb.cmake
+@@ -24,7 +24,7 @@ set(_gRPC_UPB_LIBRARIES upb)
+ 
+ elseif(gRPC_UPB_PROVIDER STREQUAL "package")
+     find_package(upb CONFIG REQUIRED)
+-    set(_gRPC_UPB_LIBRARIES upb::upb)
++    set(_gRPC_UPB_LIBRARIES upb::descriptor_upb_proto upb::upb upb::textformat)
+     set(_gRPC_UPB_INCLUDE_DIR)
+     set(upb ${_gRPC_UPB_LIBRARIES})
+     set(_gRPC_FIND_UPB "if(NOT upb_FOUND)\n  find_package(upb CONFIG REQUIRED)\nendif()")

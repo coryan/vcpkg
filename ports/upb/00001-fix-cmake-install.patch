@@ -1,0 +1,29 @@
+diff --git a/cmake/CMakeLists.txt b/cmake/CMakeLists.txt
+index 6489c77..964b03e 100644
+--- a/cmake/CMakeLists.txt
++++ b/cmake/CMakeLists.txt
+@@ -66,7 +66,11 @@ endif()
+ enable_testing()
+ 
+ add_library(port INTERFACE)
+-add_library(descriptor_upbproto INTERFACE)
++add_library(descriptor_upb_proto 
++  google/protobuf/descriptor.upb.c
++  google/protobuf/descriptor.upb.h)
++target_link_libraries(descriptor_upb_proto
++  upb)
+ add_library(upb
+   ../upb/decode.c
+   ../upb/decode.int.h
+@@ -184,9 +188,10 @@ install(TARGETS
+   upb_pb
+   port
+   table
+-  descriptor_upbproto
++  descriptor_upb_proto
+   handlers
+   reflection
++  textformat
+   EXPORT upb-config
+ )
+ install(EXPORT upb-config NAMESPACE upb:: DESTINATION share/upb)
