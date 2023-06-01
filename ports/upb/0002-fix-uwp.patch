@@ -1,8 +1,8 @@
-diff --git a/upb/json_decode.c b/upb/json_decode.c
-index c4698f0..20226f5 100644
---- a/upb/json_decode.c
-+++ b/upb/json_decode.c
-@@ -1217,7 +1217,7 @@ static void jsondec_struct(jsondec* d, upb_Message* msg,
+diff --git a/upb/json/decode.c b/upb/json/decode.c
+index 51a0937..dd8fe00 100644
+--- a/upb/json/decode.c
++++ b/upb/json/decode.c
+@@ -1176,7 +1176,7 @@ static void jsondec_struct(jsondec* d, upb_Message* msg,
  static void jsondec_wellknownvalue(jsondec* d, upb_Message* msg,
                                     const upb_MessageDef* m) {
    upb_MessageValue val;

@@ -3,11 +3,11 @@ vcpkg_check_linkage(ONLY_STATIC_LIBRARY)
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO protocolbuffers/upb
-    REF e4635f223e7d36dfbea3b722a4ca4807a7e882e2 # 2022-06-21
-    SHA512 c5d48b1d87be7db65ad1f04f5ab43d694958d0e6892fd79c29993e564a402891fcd24ee9d34a9ca642ad20b80c02d3157675885edb6bd3bbc8cf5f29cc3be32c
+    REF af735076087f77099835f546572556a91c97b047 # 2023-05-18
+    SHA512 b61f158a86ba2d76144334d14a5bdcf415ffaddfe2b83cb4d8b778068250e903c536ee6fa4e51d8aca4409e2a6b44639bfbbb46fe9b77dc371b52d014fa3b4fd
     HEAD_REF master
     PATCHES
-        0001-make-cmakelists-py.patch
+#        0001-make-cmakelists-py.patch
         0002-fix-uwp.patch
 )
 
@@ -18,7 +18,7 @@ vcpkg_execute_required_process(
     WORKING_DIRECTORY "${SOURCE_PATH}"
     LOGNAME make_cmakelists)
 
-vcpkg_replace_string("${SOURCE_PATH}/cmake/CMakeLists.txt" "/third_party/utf8_range)" "utf8_range)")
+# vcpkg_replace_string("${SOURCE_PATH}/cmake/CMakeLists.txt" "/third_party/utf8_range)" "utf8_range)")
 
 vcpkg_check_features(
     OUT_FEATURE_OPTIONS FEATURE_OPTIONS

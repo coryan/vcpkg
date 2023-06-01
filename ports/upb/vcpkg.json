@@ -1,6 +1,6 @@
 {
   "name": "upb",
-  "version-date": "2023-06-01",
+  "version-date": "2023-05-18",
   "description": "μpb (often written 'upb') is a small protobuf implementation written in C.",
   "homepage": "https://github.com/protocolbuffers/upb/",
   "license": "BSD-2-Clause",
@@ -11,6 +11,10 @@
       "features": [
         "codegen"
       ]
+    },
+    {
+      "name": "protobuf",
+      "version>=": "4.23.2"
     },
     {
       "name": "vcpkg-cmake",
