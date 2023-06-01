@@ -77,11 +77,17 @@ endif()
 
 protobuf_try_remove_recurse_wait("${CURRENT_PACKAGES_DIR}/debug/share")
 
+# Protobuf uses a peculiar versioning scheme, documented at:
+#     https://protobuf.dev/news/2022-05-06/
+# TL;DR; Protobuf for C++ is version MM.XX.y while the Protobuf version is XX.y
+# For example, as-of 2023-05 C++ is at 4.23.2 while protobuf is 23.2.
+string(REGEX REPLACE "^[0-9]*\\.(.*)" "\\1" PROTOBUF_VERSION "${VERSION}")
+message("DEBUG DEBUG PB=${PROTOBUF_VERSION} VERSION=${VERSION}")
 if(protobuf_BUILD_PROTOC_BINARIES)
     if(VCPKG_TARGET_IS_WINDOWS)
         vcpkg_copy_tools(TOOL_NAMES protoc AUTO_CLEAN)
     else()
-        vcpkg_copy_tools(TOOL_NAMES protoc protoc-${VERSION}.0 AUTO_CLEAN)
+        vcpkg_copy_tools(TOOL_NAMES protoc protoc-${PROTOBUF_VERSION}.0 AUTO_CLEAN)
     endif()
 else()
     file(COPY "${CURRENT_HOST_INSTALLED_DIR}/tools/${PORT}" DESTINATION "${CURRENT_PACKAGES_DIR}/tools")
@@ -111,7 +117,7 @@ if(VCPKG_LIBRARY_LINKAGE STREQUAL "dynamic")
 endif()
 
 vcpkg_copy_pdbs()
-set(packages protobuf protobuf-lite)
+set(packages protobuf protobuf-lite utf8_range)
 foreach(_package IN LISTS packages)
     set(_file "${CURRENT_PACKAGES_DIR}/debug/lib/pkgconfig/${_package}.pc")
     if(EXISTS "${_file}")
