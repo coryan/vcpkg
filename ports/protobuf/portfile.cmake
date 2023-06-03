@@ -7,7 +7,7 @@ vcpkg_from_github(
     SHA512 2bff54f80bcf5eac015d6eca5a57a96ced4dbc3f5c05ab1095b95c73fb44b06f98f74f1b235ecea5ed7ee45a8702fff9771c83d6e8a2bdfe012a84f0a93d2b26
     HEAD_REF master
     PATCHES
-#        fix-static-build.patch
+        fix-static-build.patch
 #        fix-default-proto-file-path.patch
 #        compile_options.patch
 )
@@ -92,6 +92,8 @@ if(protobuf_BUILD_PROTOC_BINARIES)
 else()
     file(COPY "${CURRENT_HOST_INSTALLED_DIR}/tools/${PORT}" DESTINATION "${CURRENT_PACKAGES_DIR}/tools")
 endif()
+
+vcpkg_cmake_config_fixup(PACKAGE_NAME utf8_range CONFIG_PATH lib/cmake/utf8_range)
 
 vcpkg_replace_string("${CURRENT_PACKAGES_DIR}/share/${PORT}/protobuf-config.cmake"
     "if(protobuf_MODULE_COMPATIBLE)"
