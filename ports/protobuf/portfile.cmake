@@ -8,8 +8,8 @@ vcpkg_from_github(
     HEAD_REF master
     PATCHES
         fix-static-build.patch
-#        fix-default-proto-file-path.patch
-#        compile_options.patch
+        fix-default-proto-file-path.patch
+        compile_options.patch
 )
 
 string(COMPARE EQUAL "${TARGET_TRIPLET}" "${HOST_TRIPLET}" protobuf_BUILD_PROTOC_BINARIES)
