@@ -1,42 +1,110 @@
-  diff --git a/cmake/make_cmakelists.py b/cmake/make_cmakelists.py
-index d64c14f6..ad3597c3 100755
+diff --git a/cmake/make_cmakelists.py b/cmake/make_cmakelists.py
+index 6e552ba..883794e 100755
 --- a/cmake/make_cmakelists.py
 +++ b/cmake/make_cmakelists.py
-@@ -316,10 +316,136 @@ class Converter(object):
+@@ -52,10 +52,12 @@ class BuildFileFunctions(object):
+   def _add_deps(self, kwargs, keyword=""):
+     if "deps" not in kwargs:
+       return
++    deps = StripFirstChar(kwargs["deps"])
++    deps = [d if d != "utf8_range" else "utf8_range::utf8_range" for d in deps]
+     self.converter.toplevel += "target_link_libraries(%s%s\n  %s)\n" % (
+         kwargs["name"],
+         keyword,
+-        "\n  ".join(StripFirstChar(kwargs["deps"]))
++        "\n  ".join(deps)
+     )
+ 
+   def load(self, *args):
+@@ -81,12 +83,16 @@ class BuildFileFunctions(object):
+       else:
+         found_files.append("../" + file)
+ 
++    self.converter.install_targets += "\n  %s" % kwargs["name"]
+     if list(filter(IsSourceFile, files)):
+       # Has sources, make this a normal library.
+       self.converter.toplevel += "add_library(%s\n  %s)\n" % (
+           kwargs["name"],
+           "\n  ".join(found_files)
+       )
++      self.converter.toplevel += """set_target_properties(%(name)s PROPERTIES OUTPUT_NAME upb_%(name)s)
++target_include_directories(%(name)s PUBLIC $<INSTALL_INTERFACE:include>)
++""" % kwargs
+       self._add_deps(kwargs)
+     else:
+       # Header-only library, have to do a couple things differently.
+@@ -95,8 +101,11 @@ class BuildFileFunctions(object):
+       self.converter.toplevel += "add_library(%s INTERFACE)\n" % (
+           kwargs["name"]
+       )
++      self.converter.toplevel += """target_include_directories(%(name)s INTERFACE $<INSTALL_INTERFACE:include>)
++""" % kwargs
+       self._add_deps(kwargs, " INTERFACE")
+ 
++
+   def cc_binary(self, **kwargs):
+     pass
+ 
+@@ -287,12 +296,14 @@ class Converter(object):
+     self.toplevel = ""
+     self.if_lua = ""
+     self.utf8_range_commit = ""
++    self.install_targets = ""
+ 
+   def convert(self):
+     return self.template % {
+         "prelude": converter.prelude,
+         "toplevel": converter.toplevel,
+         "utf8_range_commit": converter.utf8_range_commit,
++        "install_targets": converter.install_targets,
+     }
+ 
+   template = textwrap.dedent("""\
+@@ -349,24 +360,8 @@ class Converter(object):
+     include_directories(../cmake)
+     include_directories(${CMAKE_CURRENT_BINARY_DIR})
+ 
+-    if(NOT TARGET utf8_range)
+-      if(EXISTS ../external/utf8_range)
+-        # utf8_range is already installed
+-        include_directories(../external/utf8_range)
+-      else()
+-        include(FetchContent)
+-        FetchContent_Declare(
+-          utf8_range
+-          GIT_REPOSITORY "https://github.com/protocolbuffers/utf8_range.git"
+-          GIT_TAG "%(utf8_range_commit)s"
+-        )
+-        FetchContent_GetProperties(utf8_range)
+-        if(NOT utf8_range_POPULATED)
+-          FetchContent_Populate(utf8_range)
+-          include_directories(${utf8_range_SOURCE_DIR})
+-        endif()
+-      endif()
+-    endif()
++    # In vcpkg this is provided by the Protobuf package.
++    find_package(utf8_range CONFIG REQUIRED)
+ 
+     if(APPLE)
+       set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -undefined dynamic_lookup -flat_namespace")
+@@ -374,10 +369,99 @@ class Converter(object):
        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--build-id")
      endif()
-
+ 
 +    if (MSVC)
 +      add_compile_options(/wd4146 /wd4703 -D_CRT_SECURE_NO_WARNINGS)
 +    endif()
 +
-     enable_testing()
-
-+    set(CMAKE_CXX_STANDARD 11)
-+
-+    if (VCPKG_UPB_BUILD_CODEGEN)
-+      find_package(absl CONFIG REQUIRED)
-+      find_package(protobuf CONFIG REQUIRED)
-+
-+      if (ABSL_USE_CXX17)
-+        message(STATUS "Found absl uses CXX17, enable CXX17 feature.")
-+        set(CMAKE_CXX_STANDARD 17)
-+      endif()
-+    endif()
-+
 +    add_library(descriptor_upb_proto)
 +
-+    add_library(utf8_range
-+      ../third_party/utf8_range/naive.c
-+      ../third_party/utf8_range/range2-neon.c
-+      ../third_party/utf8_range/range2-sse.c
-+      ../third_party/utf8_range/utf8_range.h
-+    )
-+
+     enable_testing()
+ 
      %(toplevel)s
-
+ 
 +    set(UPB_DESCRIPTOR_PROTO "${VCPKG_UPB_HOST_INCLUDE_DIR}/google/protobuf/descriptor.proto")
 +    if (VCPKG_UPB_BUILD_CODEGEN)
++      find_package(absl CONFIG REQUIRED)
++      find_package(Protobuf CONFIG REQUIRED)
 +      set(UPB_CODEGEN_TARGETS protoc-gen-upb protoc-gen-upbdefs)
 +
 +      add_executable(protoc-gen-upbdefs
@@ -62,6 +130,8 @@ index d64c14f6..ad3597c3 100755
 +        upb
 +        absl::flat_hash_map
 +        absl::flat_hash_set
++        absl::absl_check
++        absl::absl_log
 +        absl::strings
 +        protobuf::libprotobuf
 +        protobuf::libprotoc
@@ -98,15 +168,6 @@ index d64c14f6..ad3597c3 100755
 +
 +    target_sources(descriptor_upb_proto PRIVATE ${UPB_DESCRIPTOR_SOURCES})
 +
-+    set_target_properties(reflection PROPERTIES OUTPUT_NAME upb_reflection)
-+    set_target_properties(fastdecode PROPERTIES OUTPUT_NAME upb_fastdecode)
-+    set_target_properties(textformat PROPERTIES OUTPUT_NAME upb_textformat)
-+    set_target_properties(json PROPERTIES OUTPUT_NAME upb_json)
-+    set_target_properties(utf8_range PROPERTIES OUTPUT_NAME upb_utf8_range)
-+    set_target_properties(mini_table PROPERTIES OUTPUT_NAME upb_mini_table)
-+    set_target_properties(extension_registry PROPERTIES OUTPUT_NAME upb_extension_registry)
-+    set_target_properties(collections PROPERTIES OUTPUT_NAME upb_collections)
-+
 +    install(
 +      DIRECTORY ../upb
 +      DESTINATION include
@@ -116,26 +177,13 @@ index d64c14f6..ad3597c3 100755
 +      PATTERN "*.inc"
 +      PATTERN "*.int.h"
 +    )
-+    target_include_directories(upb PUBLIC $<INSTALL_INTERFACE:include>)
 +    install(TARGETS
-+      upb
-+      utf8_range
-+      fastdecode
-+      json
-+      port
-+      table
-+      descriptor_upb_proto
-+      reflection
-+      textformat
-+      mini_table_internal
-+      mini_table
-+      extension_registry
-+      collections
 +      ${UPB_CODEGEN_TARGETS}
++      descriptor_upb_proto
++      %(install_targets)s
 +      EXPORT upb-config
 +    )
 +    install(EXPORT upb-config NAMESPACE upb:: DESTINATION share/upb)
-+
    """)
-
+ 
  data = {}

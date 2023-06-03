@@ -7,7 +7,7 @@ vcpkg_from_github(
     SHA512 b61f158a86ba2d76144334d14a5bdcf415ffaddfe2b83cb4d8b778068250e903c536ee6fa4e51d8aca4409e2a6b44639bfbbb46fe9b77dc371b52d014fa3b4fd
     HEAD_REF master
     PATCHES
-#        0001-make-cmakelists-py.patch
+        0001-make-cmakelists-py.patch
         0002-fix-uwp.patch
 )
 
@@ -17,8 +17,6 @@ vcpkg_execute_required_process(
     COMMAND "${PYTHON3}" "${SOURCE_PATH}/cmake/make_cmakelists.py" "cmake/CMakeLists.txt"
     WORKING_DIRECTORY "${SOURCE_PATH}"
     LOGNAME make_cmakelists)
-
-# vcpkg_replace_string("${SOURCE_PATH}/cmake/CMakeLists.txt" "/third_party/utf8_range)" "utf8_range)")
 
 vcpkg_check_features(
     OUT_FEATURE_OPTIONS FEATURE_OPTIONS
