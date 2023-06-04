@@ -1,0 +1,17 @@
+diff --git a/third_party/utf8_range/CMakeLists.txt b/third_party/utf8_range/CMakeLists.txt
+index 344952d..a6b6def 100644
+--- a/third_party/utf8_range/CMakeLists.txt
++++ b/third_party/utf8_range/CMakeLists.txt
+@@ -16,10 +16,12 @@ add_library (utf8_range STATIC
+   range2-neon.c
+   range2-sse.c
+ )
++target_include_directories(utf8_range PUBLIC $<INSTALL_INTERFACE:include>)
+ 
+ ##
+ # A heavier-weight C++ wrapper that supports Abseil.
+ add_library (utf8_validity STATIC utf8_validity.cc)
++target_include_directories(utf8_validity PUBLIC $<INSTALL_INTERFACE:include>)
+ 
+ # Load Abseil dependency.
+ if (NOT TARGET absl::strings)
