@@ -1,51 +1,133 @@
 diff --git a/cmake/make_cmakelists.py b/cmake/make_cmakelists.py
-index 6e552ba..883794e 100755
+index 6e552ba..5abd243 100755
 --- a/cmake/make_cmakelists.py
 +++ b/cmake/make_cmakelists.py
-@@ -52,10 +52,12 @@ class BuildFileFunctions(object):
-   def _add_deps(self, kwargs, keyword=""):
+@@ -49,27 +49,42 @@ class BuildFileFunctions(object):
+   def __init__(self, converter):
+     self.converter = converter
+ 
+-  def _add_deps(self, kwargs, keyword=""):
++  def _add_deps(self, kwargs, libname, keyword):
      if "deps" not in kwargs:
        return
-+    deps = StripFirstChar(kwargs["deps"])
+-    self.converter.toplevel += "target_link_libraries(%s%s\n  %s)\n" % (
+-        kwargs["name"],
++    deps = kwargs["deps"]
++    deps = StripFirstChar(deps)
 +    deps = [d if d != "utf8_range" else "utf8_range::utf8_range" for d in deps]
-     self.converter.toplevel += "target_link_libraries(%s%s\n  %s)\n" % (
-         kwargs["name"],
++    self.converter.toplevel += "target_link_libraries(%s %s\n  %s)\n" % (
++        libname,
          keyword,
 -        "\n  ".join(StripFirstChar(kwargs["deps"]))
++        "\n  ".join(deps)
++    )
++
++  def _add_bootstrap_deps(self, kwargs, libname, keyword):
++    if "bootstrap_deps" not in kwargs:
++      return
++    deps = kwargs["bootstrap_deps"]
++    deps = StripFirstChar(deps)
++    deps = [d + "-bootstrap" for d in deps]
++    self.converter.toplevel += "target_link_libraries(%s %s\n  %s)\n" % (
++        libname,
++        keyword,
 +        "\n  ".join(deps)
      )
  
    def load(self, *args):
-@@ -81,12 +83,16 @@ class BuildFileFunctions(object):
+     pass
+ 
+-  def cc_library(self, **kwargs):
+-    if kwargs["name"].endswith("amalgamation"):
+-      return
+-    if kwargs["name"] == "upbc_generator":
+-      return
+-    if kwargs["name"] == "lupb":
+-      return
++  def _cc_library(self, libname, **kwargs):
++    if libname.endswith("amalgamation"):
++      return None
++    if libname == "upbc_generator":
++      return None
++    if libname == "lupb":
++      return None
+     if "testonly" in kwargs:
+-      return
++      return None
+     files = kwargs.get("srcs", []) + kwargs.get("hdrs", [])
+     found_files = []
+     pregenerated_files = [
+@@ -81,21 +96,37 @@ class BuildFileFunctions(object):
        else:
          found_files.append("../" + file)
  
-+    self.converter.install_targets += "\n  %s" % kwargs["name"]
++    ADD_LIBRARY="""add_library(%(name)s %(sources)s)
++set_target_properties(%(name)s PROPERTIES OUTPUT_NAME upb_%(name)s)
++"""
++    ADD_INTERFACE_LIBRARY="""add_library(%(name)s INTERFACE)
++"""
++
      if list(filter(IsSourceFile, files)):
        # Has sources, make this a normal library.
-       self.converter.toplevel += "add_library(%s\n  %s)\n" % (
-           kwargs["name"],
-           "\n  ".join(found_files)
-       )
-+      self.converter.toplevel += """set_target_properties(%(name)s PROPERTIES OUTPUT_NAME upb_%(name)s)
-+target_include_directories(%(name)s PUBLIC $<INSTALL_INTERFACE:include>)
-+""" % kwargs
-       self._add_deps(kwargs)
-     else:
-       # Header-only library, have to do a couple things differently.
-@@ -95,8 +101,11 @@ class BuildFileFunctions(object):
-       self.converter.toplevel += "add_library(%s INTERFACE)\n" % (
-           kwargs["name"]
-       )
-+      self.converter.toplevel += """target_include_directories(%(name)s INTERFACE $<INSTALL_INTERFACE:include>)
-+""" % kwargs
-       self._add_deps(kwargs, " INTERFACE")
- 
+-      self.converter.toplevel += "add_library(%s\n  %s)\n" % (
+-          kwargs["name"],
+-          "\n  ".join(found_files)
+-      )
+-      self._add_deps(kwargs)
+-    else:
+-      # Header-only library, have to do a couple things differently.
+-      # For some info, see:
+-      #  http://mariobadr.com/creating-a-header-only-library-with-cmake.html
+-      self.converter.toplevel += "add_library(%s INTERFACE)\n" % (
+-          kwargs["name"]
+-      )
+-      self._add_deps(kwargs, " INTERFACE")
++      self.converter.toplevel += ADD_LIBRARY % {"name": libname, "sources": "\n  ".join(found_files)}
++      self._add_deps(kwargs, libname, "PUBLIC")
++      return "PUBLIC"
++    # Header-only library, have to do a couple things differently.
++    # For some info, see:
++    #  http://mariobadr.com/creating-a-header-only-library-with-cmake.html
++    self.converter.toplevel += ADD_INTERFACE_LIBRARY % {"name": libname}
++    self._add_deps(kwargs, libname, "INTERFACE")
++    return "INTERFACE"
 +
++  def cc_library(self, **kwargs):
++    libname=kwargs["name"]
++    INCLUDE_DIRECTORIES="""target_include_directories(%(name)s %(keyword)s
++    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/..>
++    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/../cmake>
++    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
++    $<INSTALL_INTERFACE:include>)
++"""
++    keyword = self._cc_library(libname, **kwargs)
++    if keyword is None:
++      return
++    self.converter.toplevel += INCLUDE_DIRECTORIES % {"name": libname, "keyword": keyword}
++    self.converter.install_targets += "\n  %s" % kwargs["name"]
+ 
    def cc_binary(self, **kwargs):
      pass
+@@ -207,6 +238,18 @@ class BuildFileFunctions(object):
+     pass
  
-@@ -287,12 +296,14 @@ class Converter(object):
+   def bootstrap_cc_library(self, **kwargs):
++    INCLUDE_DIRECTORIES="""target_include_directories(%(name)s %(keyword)s
++    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/..>
++    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>)
++"""
++    libname = kwargs["name"] + "-bootstrap"
++    keyword = self._cc_library(libname, **kwargs)
++    if keyword is None:
++      return
++    self._add_bootstrap_deps(kwargs, libname, keyword)
++    self.converter.toplevel += INCLUDE_DIRECTORIES % {"name": libname, "keyword": keyword}
++
++  def bootstrap_cc_binary(self, **kwargs):
+     pass
+ 
+ 
+@@ -287,12 +330,14 @@ class Converter(object):
      self.toplevel = ""
      self.if_lua = ""
      self.utf8_range_commit = ""
@@ -60,10 +142,14 @@ index 6e552ba..883794e 100755
      }
  
    template = textwrap.dedent("""\
-@@ -349,24 +360,8 @@ class Converter(object):
-     include_directories(../cmake)
-     include_directories(${CMAKE_CURRENT_BINARY_DIR})
+@@ -345,28 +390,8 @@ class Converter(object):
+       set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=address")
+     endif()
  
+-    include_directories(..)
+-    include_directories(../cmake)
+-    include_directories(${CMAKE_CURRENT_BINARY_DIR})
+-
 -    if(NOT TARGET utf8_range)
 -      if(EXISTS ../external/utf8_range)
 -        # utf8_range is already installed
@@ -87,7 +173,7 @@ index 6e552ba..883794e 100755
  
      if(APPLE)
        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -undefined dynamic_lookup -flat_namespace")
-@@ -374,10 +369,99 @@ class Converter(object):
+@@ -374,10 +399,134 @@ class Converter(object):
        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--build-id")
      endif()
  
@@ -107,31 +193,66 @@ index 6e552ba..883794e 100755
 +      find_package(Protobuf CONFIG REQUIRED)
 +      set(UPB_CODEGEN_TARGETS protoc-gen-upb protoc-gen-upbdefs)
 +
-+      add_executable(protoc-gen-upbdefs
-+        ../upbc/common.h
-+        ../upbc/common.cc
-+        ../upbc/protoc-gen-upbdefs.cc
++      add_library(descriptor_upb_proto-bootstrap STATIC
++        ../upb/reflection/stage0/google/protobuf/descriptor.upb.c)
++      target_include_directories(descriptor_upb_proto-bootstrap PUBLIC
++        "${PROJECT_SOURCE_DIR}/../upb/reflection/stage0")
++      target_link_libraries(descriptor_upb_proto-bootstrap PRIVATE
++        generated_code_support__only_for_generated_code_do_not_use__i_give_permission_to_break_me
++        mini_table
 +      )
-+      target_link_libraries(protoc-gen-upbdefs PRIVATE
++      add_executable(protoc-gen-upb
++        ../upb/util/def_to_proto.c
++        ../upbc/common.cc
++        ../upbc/file_layout.cc
++        ../upbc/names.cc
++        ../upbc/stage0/google/protobuf/compiler/plugin.upb.c
++        ../upbc/protoc-gen-upb.cc
++      )
++      target_include_directories(protoc-gen-upb
++          PRIVATE
++            "${PROJECT_SOURCE_DIR}/../upb/reflection/stage0"
++            "${PROJECT_SOURCE_DIR}/../upbc/stage0"
++            "${PROJECT_SOURCE_DIR}/..")
++      target_link_libraries(protoc-gen-upb PRIVATE
++        reflection-bootstrap
++        descriptor_upb_proto-bootstrap
++        mem
++        mini_table_internal
++        port
++        wire_types
++        absl::absl_check
 +        absl::flat_hash_map
++        absl::flat_hash_set
++        absl::log
 +        absl::strings
 +        protobuf::libprotobuf
 +        protobuf::libprotoc
 +      )
 +
-+      add_executable(protoc-gen-upb
-+        ../upbc/common.h
++      add_executable(protoc-gen-upbdefs
++        ../upb/util/def_to_proto.c
 +        ../upbc/common.cc
-+        ../upbc/protoc-gen-upb.cc
++        ../upbc/file_layout.cc
++        ../upbc/names.cc
++        ../upbc/stage0/google/protobuf/compiler/plugin.upb.c
++        ../upbc/protoc-gen-upbdefs.cc
 +      )
-+      target_link_libraries(protoc-gen-upb PRIVATE
-+        mini_table
++      target_include_directories(protoc-gen-upbdefs
++          PRIVATE
++            "${PROJECT_SOURCE_DIR}/../upb/reflection/stage0"
++            "${PROJECT_SOURCE_DIR}/../upbc/stage0"
++            "${PROJECT_SOURCE_DIR}/..")
++      target_link_libraries(protoc-gen-upbdefs PRIVATE
++        reflection-bootstrap
++        descriptor_upb_proto-bootstrap
++        mem
++        mini_table_internal
 +        port
-+        upb
-+        absl::flat_hash_map
-+        absl::flat_hash_set
++        wire_types
 +        absl::absl_check
-+        absl::absl_log
++        absl::flat_hash_map
++        absl::log
 +        absl::strings
 +        protobuf::libprotobuf
 +        protobuf::libprotoc
